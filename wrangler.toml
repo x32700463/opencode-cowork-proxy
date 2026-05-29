@@ -1,3 +1,6 @@
 name = "opencode-cowork-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-05-30"
+
+[vars]
+API_KEY = "654321654321"

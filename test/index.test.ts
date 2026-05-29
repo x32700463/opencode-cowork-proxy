@@ -8,32 +8,25 @@ describe('worker routing', () => {
     vi.restoreAllMocks();
   });
 
-  it('routes /v1/models to Anthropic models endpoint with Anthropic headers', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('{"data":[]}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
-    );
-
+  it('routes /v1/models to return free models list', async () => {
     const request = new Request('https://proxy.example/v1/models', {
       headers: {
         'x-api-key': key,
-        'x-upstream-url': 'https://api.anthropic.com',
-        'x-upstream-format': 'anthropic',
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'tools-2024-04-04',
       },
     });
 
-    await worker.fetch(request);
-
-    expect(fetchMock).toHaveBeenCalledWith('https://api.anthropic.com/v1/models', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': key,
-        'Anthropic-Version': '2023-06-01',
-        'Anthropic-Beta': 'tools-2024-04-04',
-      },
-    });
+    const response = await worker.fetch(request);
+    const body = await response.json();
+    
+    expect(response.status).toBe(200);
+    expect(body.object).toBe('list');
+    expect(body.data).toHaveLength(4);
+    expect(body.data.map((m: any) => m.id)).toEqual([
+      'deepseek-v4-flash-free',
+      'big-pickle',
+      'mimo-v2.5-free',
+      'nemotron-3-super-free',
+    ]);
   });
 
   it('forwards Anthropic beta header when translating OpenAI requests to Anthropic', async () => {
@@ -53,7 +46,7 @@ describe('worker routing', () => {
         'x-upstream-format': 'anthropic',
         'anthropic-beta': 'tools-2024-04-04',
       },
-      body: JSON.stringify({ model: 'claude-test', messages: [{ role: 'user', content: 'hi' }] }),
+      body: JSON.stringify({ model: 'deepseek-v4-flash-free', messages: [{ role: 'user', content: 'hi' }] }),
     });
 
     await worker.fetch(request);
@@ -78,7 +71,7 @@ describe('worker routing', () => {
     const request = new Request('https://proxy.example/go/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
-      body: JSON.stringify({ model: 'deepseek-v4-pro', messages: [{ role: 'user', content: 'hi' }] }),
+      body: JSON.stringify({ model: 'deepseek-v4-flash-free', messages: [{ role: 'user', content: 'hi' }] }),
     });
 
     await worker.fetch(request);
@@ -100,7 +93,7 @@ describe('worker routing', () => {
     const request = new Request('https://proxy.example/zen/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
-      body: JSON.stringify({ model: 'qwen3.5-plus', messages: [{ role: 'user', content: 'hi' }] }),
+      body: JSON.stringify({ model: 'deepseek-v4-flash-free', messages: [{ role: 'user', content: 'hi' }] }),
     });
 
     await worker.fetch(request);
@@ -126,7 +119,7 @@ describe('worker routing', () => {
     const request = new Request('https://proxy.example/zen/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
-      body: JSON.stringify({ model: 'minimax-m2.5-free', messages: [{ role: 'user', content: 'hi' }] }),
+      body: JSON.stringify({ model: 'deepseek-v4-flash-free', messages: [{ role: 'user', content: 'hi' }] }),
     });
 
     const response = await worker.fetch(request);
@@ -138,38 +131,42 @@ describe('worker routing', () => {
     expect(await response.text()).toBe('{"error":"FreeUsageLimitError"}');
   });
 
-  it('routes /go-prefixed model discovery to OpenCode Go models', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('{"data":[]}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
-    );
-
+  it('routes /go-prefixed model discovery to return free models list', async () => {
     const request = new Request('https://proxy.example/go/v1/models', {
       headers: { 'x-api-key': key },
     });
 
-    await worker.fetch(request);
-
-    expect(fetchMock).toHaveBeenCalledWith('https://opencode.ai/zen/go/v1/models', {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${key}` },
-    });
+    const response = await worker.fetch(request);
+    const body = await response.json();
+    
+    expect(response.status).toBe(200);
+    expect(body.object).toBe('list');
+    expect(body.data).toHaveLength(4);
+    expect(body.data.map((m: any) => m.id)).toEqual([
+      'deepseek-v4-flash-free',
+      'big-pickle',
+      'mimo-v2.5-free',
+      'nemotron-3-super-free',
+    ]);
   });
 
-  it('routes /zen-prefixed model discovery to OpenCode Zen models', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('{"data":[]}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
-    );
-
+  it('routes /zen-prefixed model discovery to return free models list', async () => {
     const request = new Request('https://proxy.example/zen/v1/models', {
       headers: { 'x-api-key': key },
     });
 
-    await worker.fetch(request);
-
-    expect(fetchMock).toHaveBeenCalledWith('https://opencode.ai/zen/v1/models', {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${key}` },
-    });
+    const response = await worker.fetch(request);
+    const body = await response.json();
+    
+    expect(response.status).toBe(200);
+    expect(body.object).toBe('list');
+    expect(body.data).toHaveLength(4);
+    expect(body.data.map((m: any) => m.id)).toEqual([
+      'deepseek-v4-flash-free',
+      'big-pickle',
+      'mimo-v2.5-free',
+      'nemotron-3-super-free',
+    ]);
   });
 
   it('overrides model from URL path segment with /go prefix', async () => {
@@ -184,7 +181,7 @@ describe('worker routing', () => {
       },
     );
 
-    const request = new Request('https://proxy.example/go/minimax-m2.5-free/v1/messages', {
+    const request = new Request('https://proxy.example/go/deepseek-v4-flash-free/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
       body: JSON.stringify({
@@ -194,7 +191,7 @@ describe('worker routing', () => {
     });
 
     const response = await worker.fetch(request);
-    expect(capturedBody.model).toBe('minimax-m2.5-free');
+    expect(capturedBody.model).toBe('deepseek-v4-flash-free');
     expect(fetchMock).toHaveBeenCalledWith('https://opencode.ai/zen/go/v1/chat/completions', expect.anything());
   });
 
@@ -210,7 +207,7 @@ describe('worker routing', () => {
       },
     );
 
-    const request = new Request('https://proxy.example/zen/minimax-m2.5-free/v1/messages', {
+    const request = new Request('https://proxy.example/zen/deepseek-v4-flash-free/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
       body: JSON.stringify({
@@ -220,7 +217,7 @@ describe('worker routing', () => {
     });
 
     await worker.fetch(request);
-    expect(capturedBody.model).toBe('minimax-m2.5-free');
+    expect(capturedBody.model).toBe('deepseek-v4-flash-free');
     expect(fetchMock).toHaveBeenCalledWith('https://opencode.ai/zen/v1/chat/completions', expect.anything());
   });
 
@@ -232,7 +229,7 @@ describe('worker routing', () => {
       }),
     );
 
-    const request = new Request('https://proxy.example/go/minimax-m2.5-free/v1/messages', {
+    const request = new Request('https://proxy.example/go/deepseek-v4-flash-free/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
       body: JSON.stringify({
@@ -262,16 +259,16 @@ describe('worker routing', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash-free',
         messages: [{ role: 'user', content: 'hi' }],
       }),
     });
 
     await worker.fetch(request);
-    expect(capturedBody.model).toBe('deepseek-v4-pro');
+    expect(capturedBody.model).toBe('deepseek-v4-flash-free');
   });
 
-  it('overrides model to qwen3.5-plus when image attachments are present', async () => {
+  it('does not override model when image attachments are present', async () => {
     let capturedBody: any = null;
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
       async (_url, init: any) => {
@@ -287,7 +284,7 @@ describe('worker routing', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash-free',
         messages: [{
           role: 'user',
           content: [
@@ -300,7 +297,7 @@ describe('worker routing', () => {
     });
 
     await worker.fetch(request);
-    expect(capturedBody.model).toBe('qwen3.5-plus');
+    expect(capturedBody.model).toBe('deepseek-v4-flash-free');
     expect(Array.isArray(capturedBody.messages[0].content)).toBe(true);
     expect(capturedBody.messages[0].content).toEqual([
       { type: 'text', text: 'What is in this image?' },

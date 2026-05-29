@@ -16,13 +16,26 @@ export interface AuthError {
   body: Record<string, unknown>;
 }
 
-export function validateApiKey(key: string | null): AuthError | null {
+export function validateApiKey(key: string | null, configApiKey?: string): AuthError | null {
   if (!key) {
     return {
       status: 401,
       body: { error: { type: "authentication_error", message: "Missing API key. Provide x-api-key header." } },
     };
   }
+  
+  // 如果配置了真正的 API key，验证是否匹配
+  if (configApiKey) {
+    if (key !== configApiKey) {
+      return {
+        status: 401,
+        body: { error: { type: "authentication_error", message: "Invalid API key." } },
+      };
+    }
+    return null;
+  }
+  
+  // 未配置 API key 时，使用长度验证（兼容旧逻辑）
   if (key.length < 32) {
     return {
       status: 401,

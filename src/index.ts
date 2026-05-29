@@ -106,7 +106,7 @@ function upstreamErrorResponse(res: Response, body: string): Response {
   return new Response(body, { status: res.status, headers });
 }
 
-async function handleRequest(request: Request): Promise<Response> {
+async function handleRequest(request: Request, env?: { API_KEY?: string }): Promise<Response> {
   const route = routeConfig(request);
   const upstream = getUpstream(request, route.upstream);
   const fmt = upstreamFormat(request);
@@ -114,7 +114,7 @@ async function handleRequest(request: Request): Promise<Response> {
   // Anthropic → OpenAI (for Claude Desktop/Cowork → any OpenAI API)
   if (route.path === '/v1/messages' && request.method === 'POST') {
       const key = extractApiKey(request.headers);
-      const err = validateApiKey(key);
+      const err = validateApiKey(key, env?.API_KEY);
       if (err) return authErrorResponse(err);
 
       if (fmt === "openai") {
@@ -167,7 +167,7 @@ async function handleRequest(request: Request): Promise<Response> {
   // OpenAI → Anthropic (or pass-through)
   if (route.path === '/v1/chat/completions' && request.method === 'POST') {
       const key = extractApiKey(request.headers);
-      const err = validateApiKey(key);
+      const err = validateApiKey(key, env?.API_KEY);
       if (err) return authErrorResponse(err);
 
       if (fmt === "anthropic") {
@@ -229,7 +229,7 @@ async function handleRequest(request: Request): Promise<Response> {
   // Model discovery
   if (route.path === '/v1/models' && request.method === 'GET') {
       const key = extractApiKey(request.headers);
-      const err = validateApiKey(key);
+      const err = validateApiKey(key, env?.API_KEY);
       if (err) return authErrorResponse(err);
 
       // 返回免费模型列表
@@ -267,6 +267,15 @@ async function handleRequest(request: Request): Promise<Response> {
 }
 
 const app = new Hono();
-app.all('*', (c) => handleRequest(c.req.raw));
 
-export default app;
+type Env = {
+  API_KEY?: string;
+};
+
+app.all('*', (c) => handleRequest(c.req.raw, c.env));
+
+export default {
+  fetch(request: Request, env: Env) {
+    return app.fetch(request, env);
+  },
+};
