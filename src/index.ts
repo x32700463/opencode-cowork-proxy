@@ -12,6 +12,23 @@ const ZEN_UPSTREAM = "https://opencode.ai/zen/v1";
 const DEFAULT_UPSTREAM = GO_UPSTREAM;
 const VISION_MODEL = "qwen3.5-plus";
 
+const FREE_MODELS = new Set([
+  'deepseek-v4-flash-free',
+  'big-pickle',
+  'mimo-v2.5-free',
+  'nemotron-3-super-free',
+]);
+
+function validateModel(model: string): { valid: boolean; error?: string } {
+  if (!FREE_MODELS.has(model)) {
+    return {
+      valid: false,
+      error: `Model '${model}' is not supported. Only free models are allowed: ${Array.from(FREE_MODELS).join(', ')}`,
+    };
+  }
+  return { valid: true };
+}
+
 const API_START_PATHS = new Set(['v1', 'v2']);
 
 type RouteConfig = {
@@ -104,7 +121,18 @@ async function handleRequest(request: Request): Promise<Response> {
         const req = await request.json();
         const originalModel = req.model;
         if (route.modelOverride) req.model = route.modelOverride;
-        if (hasImages(req)) req.model = VISION_MODEL;
+        
+        // 验证模型是否为免费模型
+        const modelValidation = validateModel(req.model);
+        if (!modelValidation.valid) {
+          return new Response(JSON.stringify({
+            error: { type: "invalid_request_error", message: modelValidation.error }
+          }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        
         const openaiReq = formatAnthropicToOpenAI(req);
         const res = await fetch(`${upstream}/chat/completions`, {
           method: "POST",
@@ -144,6 +172,18 @@ async function handleRequest(request: Request): Promise<Response> {
 
       if (fmt === "anthropic") {
         const req = await request.json();
+        
+        // 验证模型是否为免费模型
+        const modelValidation = validateModel(req.model);
+        if (!modelValidation.valid) {
+          return new Response(JSON.stringify({
+            error: { type: "invalid_request_error", message: modelValidation.error }
+          }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        
         const anthReq = formatOpenAIToAnthropic(req);
         const res = await fetch(`${upstream}/v1/messages`, {
           method: "POST",
@@ -164,10 +204,24 @@ async function handleRequest(request: Request): Promise<Response> {
       }
 
       // Pass-through to OpenAI upstream
+      const bodyText = await request.text();
+      const bodyJson = JSON.parse(bodyText);
+      
+      // 验证模型是否为免费模型
+      const modelValidation = validateModel(bodyJson.model);
+      if (!modelValidation.valid) {
+        return new Response(JSON.stringify({
+          error: { type: "invalid_request_error", message: modelValidation.error }
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      
       const res = await fetch(`${upstream}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
-        body: await request.text(),
+        body: bodyText,
       });
       return res;
   }
@@ -178,17 +232,20 @@ async function handleRequest(request: Request): Promise<Response> {
       const err = validateApiKey(key);
       if (err) return authErrorResponse(err);
 
-      const res = fmt === "anthropic"
-        ? await fetch(`${upstream}/v1/models`, {
-            method: "GET",
-            headers: anthropicHeaders(request, key),
-          })
-        : await fetch(`${upstream}/models`, {
-            method: "GET",
-            headers: { "Authorization": `Bearer ${key}` },
+      // 返回免费模型列表
+      const freeModels = Array.from(FREE_MODELS).map(id => ({
+        id,
+        object: "model",
+        created: 1779000000,
+        owned_by: "opencode-free",
+      }));
+
+      return new Response(JSON.stringify({
+        object: "list",
+        data: freeModels,
+      }, null, 2), {
+        headers: { "Content-Type": "application/json" },
       });
-      if (!res.ok) return upstreamErrorResponse(res, await res.text());
-      return new Response(await res.text(), { headers: { "Content-Type": "application/json" } });
   }
 
   return new Response(JSON.stringify({
