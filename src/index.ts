@@ -9,7 +9,7 @@ import { streamAnthropicToOpenAI } from './translate/stream/anthropic-to-openai'
 
 const GO_UPSTREAM = "https://opencode.ai/zen/go/v1";
 const ZEN_UPSTREAM = "https://opencode.ai/zen/v1";
-const DEFAULT_UPSTREAM = GO_UPSTREAM;
+const DEFAULT_UPSTREAM = ZEN_UPSTREAM;
 const VISION_MODEL = "qwen3.5-plus";
 
 const FREE_MODELS = new Set([
